@@ -7,8 +7,8 @@
     "start": "node server/index.js",
     "server": "node server/index.js",
     "client": "npm --prefix client run dev",
-    "build": "npm --prefix client run build",
-    "build-and-start": "npm --prefix client run build && node server/index.js"
+    "build": "npm --prefix client install && npm --prefix client run build",
+    "build-and-start": "npm run build && node server/index.js"
   },
   "keywords": [
     "qr-attendance",
