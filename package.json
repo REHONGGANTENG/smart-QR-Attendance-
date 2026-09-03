@@ -1,0 +1,27 @@
+{
+  "name": "smart-qr-attendance",
+  "version": "1.0.0",
+  "description": "Smart QR Attendance System with Admin Dashboard and User Mobile Scanner",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "server": "node server/index.js",
+    "client": "npm --prefix client run dev",
+    "build": "npm --prefix client run build",
+    "build-and-start": "npm --prefix client run build && node server/index.js"
+  },
+  "keywords": [
+    "qr-attendance",
+    "admin-dashboard",
+    "scanner",
+    "realtime"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "qrcode": "^1.5.4"
+  }
+}
