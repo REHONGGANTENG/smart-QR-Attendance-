@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+client/node_modules/
+
+# Production builds
+client/dist/
+
+# SQLite Database local files
+server/*.db
+server/*.db-shm
+server/*.db-wal
+attendance.db*
+
+# Logs & temp
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
