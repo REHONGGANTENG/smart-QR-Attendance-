@@ -3,7 +3,7 @@ import {
   Search, Download, UserPlus, Trash2, Filter, 
   Clock, CheckCircle2, AlertTriangle, Calendar, FileSpreadsheet, RefreshCw 
 } from 'lucide-react';
-import { getExportUrl, deleteAttendance } from '../api';
+import { exportAttendanceCSV, deleteAttendance } from '../api';
 
 export default function AttendanceTable({ 
   attendances = [], 
@@ -115,14 +115,14 @@ export default function AttendanceTable({
               <span>Input Manual</span>
             </button>
 
-            <a
-              href={getExportUrl(selectedSessionId)}
-              download
-              className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm shadow-emerald-500/20 transition-all"
+            <button
+              onClick={() => exportAttendanceCSV(filteredRecords, selectedSessionId)}
+              className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm shadow-emerald-500/20 transition-all cursor-pointer"
+              title="Unduh rekap kehadiran dalam format CSV"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Ekspor CSV / Excel</span>
-            </a>
+            </button>
           </div>
         </div>
 

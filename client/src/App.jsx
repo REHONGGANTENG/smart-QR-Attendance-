@@ -1,10 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import UserScanner from './components/UserScanner';
 import AdminDashboard from './components/AdminDashboard';
 import ProjectorMode from './components/ProjectorMode';
 import AdminAuthModal from './components/AdminAuthModal';
-import { getSessions, playSuccessSound } from './api';
+import FirebaseGuideBanner from './components/FirebaseGuideBanner';
+import { 
+  getSessions, playSuccessSound, subscribeSessions, 
+  subscribeAttendances, isFirebaseConfigured 
+} from './api';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('user'); // 'user' | 'admin'
@@ -18,7 +22,7 @@ export default function App() {
   const [allSessions, setAllSessions] = useState([]);
 
   // Real-time events
-  const [sseConnected, setSseConnected] = useState(false);
+  const [sseConnected, setSseConnected] = useState(true);
   const [latestAttendee, setLatestAttendee] = useState(null);
 
   // URL Query Params handling (e.g. ?code=ATT101 or ?tab=admin)
@@ -37,58 +41,32 @@ export default function App() {
     }
   }, []);
 
-  // Fetch initial sessions for projector fallback
+  // Real-time subscription for Sessions
   useEffect(() => {
-    getSessions()
-      .then(sessions => {
-        setAllSessions(sessions);
-      })
-      .catch(err => console.error(err));
+    const unsub = subscribeSessions((sessions) => {
+      setAllSessions(sessions);
+    });
+    return () => {
+      if (typeof unsub === 'function') unsub();
+    };
   }, []);
 
-  // Connect to SSE (Server-Sent Events) for real-time live attendance
+  // Real-time subscription for Attendances (Firestore onSnapshot)
   useEffect(() => {
-    let eventSource = null;
-    let reconnectTimeout = null;
-
-    const connectSSE = () => {
-      try {
-        eventSource = new EventSource('/api/events');
-
-        eventSource.onopen = () => {
-          setSseConnected(true);
-        };
-
-        eventSource.addEventListener('NEW_ATTENDANCE', (e) => {
-          try {
-            const data = JSON.parse(e.data);
-            setLatestAttendee(data);
-            // If in admin mode, play soft notification sound
-            if (activeTab === 'admin' || projectorSession) {
-              playSuccessSound();
-            }
-          } catch (err) {
-            console.error('Error parsing SSE NEW_ATTENDANCE:', err);
-          }
-        });
-
-        eventSource.onerror = () => {
-          setSseConnected(false);
-          eventSource.close();
-          reconnectTimeout = setTimeout(connectSSE, 5000);
-        };
-      } catch (err) {
-        setSseConnected(false);
+    const unsub = subscribeAttendances(
+      (attendances) => {
+        setSseConnected(true);
+      },
+      (newAttendee) => {
+        setLatestAttendee(newAttendee);
+        if (activeTab === 'admin' || projectorSession) {
+          playSuccessSound();
+        }
       }
-    };
-
-    // Defer slightly so browser stops document loading indicator immediately
-    const initTimer = setTimeout(connectSSE, 200);
+    );
 
     return () => {
-      clearTimeout(initTimer);
-      if (eventSource) eventSource.close();
-      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (typeof unsub === 'function') unsub();
     };
   }, [activeTab, projectorSession]);
 
@@ -134,6 +112,9 @@ export default function App() {
         sseConnected={sseConnected}
       />
 
+      {/* Firebase Status & Setup Guide Banner */}
+      <FirebaseGuideBanner />
+
       {/* Main Body */}
       <main className="flex-1">
         {activeTab === 'user' && (
@@ -166,7 +147,7 @@ export default function App() {
 
       {/* Simple Footer */}
       <footer className="border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-400">
-        Smart QR Attendance System
+        Smart QR Attendance System • Powered by Google Firebase Cloud Firestore
       </footer>
     </div>
   );
