@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Camera, Upload, KeyRound, CheckCircle2, AlertCircle, 
-  Sparkles, History, User, CreditCard, Building, RefreshCw, X, ShieldAlert, Check, MapPin, Trash2
+  Sparkles, History, User, CreditCard, Building, RefreshCw, X, ShieldAlert, Check, MapPin, Trash2, Fingerprint
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Html5Qrcode } from 'html5-qrcode';
@@ -37,6 +37,7 @@ export default function UserScanner({ initialCode = '' }) {
   });
 
   const [rememberMe, setRememberMe] = useState(true);
+  const [biometricEnabled, setBiometricEnabled] = useState(!!localStorage.getItem('smartqr_biometric_id'));
   const [activeScanTab, setActiveScanTab] = useState('camera'); // 'camera' | 'file' | 'manual'
   const [manualCode, setManualCode] = useState(initialCode);
   const [notes, setNotes] = useState('');
@@ -171,6 +172,91 @@ export default function UserScanner({ initialCode = '' }) {
     } catch (e) {}
   };
 
+  const registerBiometric = async () => {
+    if (!window.PublicKeyCredential) {
+      alert("Perangkat atau browser Anda tidak mendukung fitur biometrik (WebAuthn).");
+      return;
+    }
+    try {
+      const challenge = new Uint8Array(32);
+      window.crypto.getRandomValues(challenge);
+      const userId = new Uint8Array(16);
+      window.crypto.getRandomValues(userId);
+
+      const publicKeyCredentialCreationOptions = {
+        challenge: challenge,
+        rp: { name: "Smart QR Attendance" },
+        user: {
+          id: userId,
+          name: profile.identifier || "User",
+          displayName: profile.name || "Peserta"
+        },
+        pubKeyCredParams: [{ alg: -7, type: "public-key" }, { alg: -257, type: "public-key" }],
+        authenticatorSelection: {
+          authenticatorAttachment: "platform",
+          userVerification: "required"
+        },
+        timeout: 60000,
+        attestation: "none"
+      };
+
+      const credential = await navigator.credentials.create({
+        publicKey: publicKeyCredentialCreationOptions
+      });
+
+      const credentialIdBase64 = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)));
+      localStorage.setItem('smartqr_biometric_id', credentialIdBase64);
+      setBiometricEnabled(true);
+      alert("Sidik jari / biometrik berhasil didaftarkan untuk akun ini di perangkat ini!");
+    } catch (err) {
+      console.error("Biometric registration failed", err);
+      alert("Gagal mendaftarkan sidik jari. Pastikan fitur pengunci layar / sidik jari aktif di HP Anda dan Anda menyetujuinya.");
+    }
+  };
+
+  const verifyBiometric = async () => {
+    const savedIdBase64 = localStorage.getItem('smartqr_biometric_id');
+    if (!savedIdBase64) return true;
+
+    try {
+      const challenge = new Uint8Array(32);
+      window.crypto.getRandomValues(challenge);
+      
+      const binaryId = Uint8Array.from(atob(savedIdBase64), c => c.charCodeAt(0));
+
+      const publicKeyCredentialRequestOptions = {
+        challenge: challenge,
+        allowCredentials: [{
+          id: binaryId,
+          type: 'public-key',
+          transports: ['internal']
+        }],
+        userVerification: "required",
+        timeout: 60000
+      };
+
+      await navigator.credentials.get({
+        publicKey: publicKeyCredentialRequestOptions
+      });
+
+      return true;
+    } catch (err) {
+      console.error("Biometric verification failed", err);
+      return false;
+    }
+  };
+
+  const disableBiometric = async () => {
+    const isVerified = await verifyBiometric();
+    if (isVerified) {
+      localStorage.removeItem('smartqr_biometric_id');
+      setBiometricEnabled(false);
+      alert("Kunci sidik jari berhasil dilepas.");
+    } else {
+      alert("Autentikasi gagal. Tidak dapat melepas kunci sidik jari.");
+    }
+  };
+
   const clearHistory = () => {
     if(window.confirm('Apakah Anda yakin ingin menghapus semua riwayat absensi di perangkat ini?')) {
       setHistoryList([]);
@@ -205,6 +291,16 @@ export default function UserScanner({ initialCode = '' }) {
     setProcessing(true);
     setErrorMessage('');
     await stopCameraScanner();
+
+    // ---- BIOMETRIC CHECK ----
+    if (biometricEnabled) {
+      const isVerified = await verifyBiometric();
+      if (!isVerified) {
+        setErrorMessage('Autentikasi sidik jari gagal atau dibatalkan. Anda tidak dapat melakukan absen.');
+        setProcessing(false);
+        return;
+      }
+    }
 
     // ---- GEOLOCATION CHECK ----
     try {
@@ -498,6 +594,29 @@ export default function UserScanner({ initialCode = '' }) {
               className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
+
+          {/* BIOMETRIC LOCK UI */}
+          <div className="mt-2 pt-3 border-t border-slate-100 flex items-center justify-between">
+            <div>
+              <h4 className="text-[11px] font-bold text-slate-700 flex items-center space-x-1.5">
+                <Fingerprint className="w-3.5 h-3.5 text-blue-600" />
+                <span>Kunci Sidik Jari (Biometrik)</span>
+              </h4>
+              <p className="text-[9px] text-slate-500 mt-0.5">
+                Mencegah orang lain absen pakai HP ini
+              </p>
+            </div>
+            {biometricEnabled ? (
+              <button onClick={disableBiometric} className="px-2.5 py-1.5 bg-red-50 text-red-600 rounded-lg text-[10px] font-bold hover:bg-red-100 transition-colors border border-red-100">
+                Lepas Kunci
+              </button>
+            ) : (
+              <button onClick={registerBiometric} className="px-2.5 py-1.5 bg-blue-600 text-white rounded-lg text-[10px] font-bold hover:bg-blue-700 transition-colors shadow-sm">
+                Aktifkan Kunci
+              </button>
+            )}
+          </div>
+
         </div>
       </div>
 
